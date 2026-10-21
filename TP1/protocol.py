@@ -5,12 +5,8 @@ class ClientType(Enum):
     CLIENT = "client"
     SENSOR = "sensor"
 
-class SENSv1:
-    def __init__(self):
-        pass
 
-    @staticmethod
-    def info():
+def info():
         print('''
         Protocol SENSv1, developed for the Systems and Networks Administration Lab N°1.
         It sends data in ASCII format, with linebreaks as terminators. 
@@ -19,27 +15,27 @@ class SENSv1:
         - The server responds with an OK message when the socket is successfully created.
         ''')
     
-    @staticmethod
-    def init_connection(client_name: str, client_type: ClientType):
-        pass
+def init_connection(client_name: str, client_type: ClientType):
+    return f'NAME:{client_name}, TYPE:{client_type}'
     
-    @staticmethod
-    def ack():
-        pass
+def ack():
+    return 'OK'
 
-    @staticmethod
-    def request_humidity():
-        pass
+def error():
+    return 'ERROR'
     
-    @staticmethod
-    def send_humidity():
-        pass
+def request_humidity():
+    return 'HUM'    
     
-    @staticmethod
-    def request_temperature():
-        pass
+def send_humidity(hum: float):
+    return f'HUM:{hum}'
+      
+def request_temperature():
+    return 'TEMP'
     
-    @staticmethod
-    def send_temperature():
-        pass
+def send_temperature(hum: float):
+    return f'TEMP:{hum}'
+
+def request_both(hum: float, temp: float):
+    return f'{send_humidity(hum)}, {send_temperature(temp)}'
     
