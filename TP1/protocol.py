@@ -21,6 +21,9 @@ def init_connection(client_name: str):
 def ack():
     return 'OK'
 
+def exit():
+    return 'EXIT'
+
 def error():
     return 'ERROR'
     
@@ -33,9 +36,12 @@ def send_humidity(hum: float):
 def request_temperature():
     return 'TEMP'
     
-def send_temperature(hum: float):
-    return f'TEMP:{hum}'
+def send_temperature(temp: float):
+    return f'TEMP:{temp}'
 
-def request_both(hum: float, temp: float):
+def request_both():
+    return 'BOTH'
+
+def send_both(hum: float, temp: float):
     return f'{send_humidity(hum)}, {send_temperature(temp)}'
     
