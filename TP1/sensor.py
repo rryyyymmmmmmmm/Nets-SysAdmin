@@ -4,17 +4,7 @@ import sys
 import random
 import time
 
-SERVER_IP = '127.0.0.1'
-SERVER_PORT = 5398
-BUFFER_SIZE = 1024
-
-def print_info():
-    print('''
-    Sensor.
-    ''')
-
-def exit():
-    pass
+from protocol import IP_ADDRESS, IP_PORT, ENCODING_FORMAT, BUFFER_SIZE, CLIENTS_NUMBER
 
 def sense_humidity():
     return random.randrange(0, 100)
@@ -25,14 +15,14 @@ def sense_temperature():
 def start_client(sensor_type: str, client_name: str):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        client_socket.connect((SERVER_IP, SERVER_PORT))
-        print(f"Connected to server at {SERVER_IP}:{SERVER_PORT}")
+        client_socket.connect((IP_ADDRESS, IP_PORT))
+        print(f"Connected to server at {IP_ADDRESS}:{IP_PORT}")
 
         message = protocol.init_connection(client_name)
-        client_socket.sendall(message.encode('utf-8'))
+        client_socket.sendall(message.encode(ENCODING_FORMAT))
         print(f"Sent: {message}")
 
-        response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+        response = client_socket.recv(BUFFER_SIZE).decode(ENCODING_FORMAT)
         print(f"Received: {response}")
 
         while True:
@@ -44,10 +34,10 @@ def start_client(sensor_type: str, client_name: str):
                 reading = sense_temperature()
                 message = protocol.send_temperature(reading)
 
-            client_socket.sendall(message.encode('utf-8'))
+            client_socket.sendall(message.encode(ENCODING_FORMAT))
             print(f"Sent: {message}")
 
-            response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+            response = client_socket.recv(BUFFER_SIZE).decode(ENCODING_FORMAT)
             if not response:
                 print("Server closed connection.")
                 break
@@ -56,11 +46,11 @@ def start_client(sensor_type: str, client_name: str):
     except KeyboardInterrupt:
         print("\nStopping sensor...")
         try:
-            client_socket.sendall(protocol.exit().encode('utf-8'))
+            client_socket.sendall(protocol.exit().encode(ENCODING_FORMAT))
         except Exception:
             pass
     except ConnectionRefusedError:
-        print(f"Connection refused: Is the server running on {SERVER_IP}:{SERVER_PORT}?")
+        print(f"Connection refused: Is the server running on {IP_ADDRESS}:{IP_PORT}?")
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:

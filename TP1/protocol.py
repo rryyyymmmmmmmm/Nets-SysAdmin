@@ -1,10 +1,15 @@
 from enum import Enum
 
+IP_ADDRESS = '127.0.0.1'
+IP_PORT = 5398
+BUFFER_SIZE = 1024
+CLIENTS_NUMBER = 3
+ENCODING_FORMAT = 'ascii'
+
 class ClientType(Enum):
     SERVER = "server"
     CLIENT = "client"
     SENSOR = "sensor"
-
 
 def info():
         print('''
