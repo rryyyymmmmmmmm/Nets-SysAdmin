@@ -9,9 +9,10 @@ By : Rym Lemmouchi, M1/G1 Networks and Embedded Systems
     -- mermaid diagram describing how the files/classes relate to each other
 
 ### Protocol Definition : 
-    characters used : ASCII only, terminate by \n, 
-    sender : TEMP_SENSOR, HUM_SENSOR, or CLIENT, or SERVER
-    commands: TEMP, HUM, BOTH, EXIT or ERROR
+    characters used : ASCII only
+    registration: NAME:<client_name>:<client|sensor>
+    sensors register as sensor and send TEMP:<value> or HUM:<value>
+    clients send TEMP, HUM, BOTH or EXIT; the server responds with readings or ERROR
 
 ### Socket : 
     MESSAGE MessageBuilder(SENDER, RECEIVER, COMMAND, VALUE),
@@ -32,4 +33,3 @@ By : Rym Lemmouchi, M1/G1 Networks and Embedded Systems
     RequestData
     ReceiveData
     DisplayData -- simple console
-

@@ -22,23 +22,14 @@ latest_readings = {
     'hum': 0.0
 }
 
+# tracks which sensor types are currently connected and running
+running_sensors = set()  # e.g. {'temp'}, {'hum'}, {'temp', 'hum'}
+
 # functions to send the latest humidity readings to the client
-def get_reading(sensor_socket, reading_type):
-    try:
-        if(reading_type == 'hum'):
-            sensor_socket.sendall(protocol.request_humidity().encode(ENCODING_FORMAT))
-        elif reading_type == 'temp':
-            sensor_socket.sendall(protocol.request_temperature().encode(ENCODING_FORMAT))
-        
-        raw_data = sensor_socket.recv(BUFFER_SIZE)
-        message = raw_data.decode(ENCODING_FORMAT).strip()
-        parsed = parse(message)
-        if not parsed or not parsed['value'] or parsed['message_type']=='error':
-            return protocol.error()
-        return parsed
-        
-    except Exception as e:
-        print(f"Error: {e}")
+def get_reading(reading_type: str):
+    if reading_type not in latest_readings:
+        raise ValueError(f"Unknown reading type: {reading_type}")
+    return latest_readings[reading_type]
 
 def get_temperature():
     return latest_readings['temp']
@@ -67,15 +58,28 @@ def parse(message: str):
     elif len(parts) >= 2:
         match parts[0]:
             case 'NAME':
-                return {'message_type': 'init', 'client_name': parts[1]}
+                return {
+                    'message_type': 'init',
+                    'client_name': parts[1],
+                    'client_type': parts[2].lower() if len(parts) >= 3 else ClientType.CLIENT.value,
+                }
             case 'TEMP':
                 return {'message_type': 'sensor_temp', 'value': float(parts[1])}
             case 'HUM':
                 return {'message_type': 'sensor_hum', 'value': float(parts[1])}
     return {'message_type': 'unknown'}
 
+# sensor_type_map maps the message_type a sensor sends to the reading key it owns
+SENSOR_MESSAGE_TO_KEY = {
+    'sensor_temp': 'temp',
+    'sensor_hum':  'hum',
+}
+
 # defining a function for handling both the client and the sensors (it will be used to define a thread further down in the coe)
 def handle_client(client_socket, client_address, client_type : ClientType):
+    client_name = str(client_address)
+    # the reading key owned by this connection if it turns out to be a sensor
+    sensor_key = None
     try:
         while True:
             # receive raw data from any client
@@ -94,37 +98,61 @@ def handle_client(client_socket, client_address, client_type : ClientType):
             match message_type:
                 case 'init':
                     client_name = parsed['client_name']
+                    registered_type = parsed['client_type']
+                    if registered_type == ClientType.SENSOR.value:
+                        client_type = ClientType.SENSOR
+                    elif registered_type == ClientType.CLIENT.value:
+                        client_type = ClientType.CLIENT
+                    else:
+                        client_socket.sendall(protocol.error().encode(ENCODING_FORMAT))
+                        break
                     print(f"[+] Added {client_name} from {client_address}")
                     client_socket.sendall(protocol.ack().encode(ENCODING_FORMAT))
-                    match client_type:
-                        case 'client':
-                            client_type = ClientType.CLIENT
-                        case 'HUM':
-                            client_type = ClientType.SENSOR
-                        case 'TEMP':
-                            client_type = ClientType.SENSOR
 
                 case 'sensor_temp' if client_type == ClientType.SENSOR:
+                    # mark temperature sensor as running on first reading
+                    if sensor_key is None:
+                        sensor_key = 'temp'
+                        running_sensors.add(sensor_key)
+                        print(f"[+] Sensor '{sensor_key}' is now running.")
                     latest_readings['temp'] = parsed['value']
                     print(f"[{client_name}] Updated TEMP: {latest_readings['temp']}")
                     client_socket.sendall(protocol.ack().encode(ENCODING_FORMAT))
 
                 case 'sensor_hum' if client_type == ClientType.SENSOR:
+                    # mark humidity sensor as running on first reading
+                    if sensor_key is None:
+                        sensor_key = 'hum'
+                        running_sensors.add(sensor_key)
+                        print(f"[+] Sensor '{sensor_key}' is now running.")
                     latest_readings['hum'] = parsed['value']
                     print(f"[{client_name}] Updated HUM: {latest_readings['hum']}")
                     client_socket.sendall(protocol.ack().encode(ENCODING_FORMAT))
 
                 case 'temp' if client_type == ClientType.CLIENT:
-                    msg = protocol.send_temperature(get_reading(client_socket))
-                    client_socket.sendall(msg.encode(ENCODING_FORMAT))
+                    if 'temp' not in running_sensors:
+                        print(f"[!] {client_name} requested TEMP but temperature sensor is not running.")
+                        client_socket.sendall(protocol.error().encode(ENCODING_FORMAT))
+                    else:
+                        msg = protocol.send_temperature(get_reading('temp'))
+                        client_socket.sendall(msg.encode(ENCODING_FORMAT))
 
                 case 'hum' if client_type == ClientType.CLIENT:
-                    msg = protocol.send_humidity(get_reading(client_socket))
-                    client_socket.sendall(msg.encode(ENCODING_FORMAT))
+                    if 'hum' not in running_sensors:
+                        print(f"[!] {client_name} requested HUM but humidity sensor is not running.")
+                        client_socket.sendall(protocol.error().encode(ENCODING_FORMAT))
+                    else:
+                        msg = protocol.send_humidity(get_reading('hum'))
+                        client_socket.sendall(msg.encode(ENCODING_FORMAT))
 
                 case 'both' if client_type == ClientType.CLIENT:
-                    msg = protocol.send_both(latest_readings['hum'], latest_readings['temp'])
-                    client_socket.sendall(msg.encode(ENCODING_FORMAT))
+                    missing = [k for k in ('temp', 'hum') if k not in running_sensors]
+                    if missing:
+                        print(f"[!] {client_name} requested BOTH but sensors not running: {missing}")
+                        client_socket.sendall(protocol.error().encode(ENCODING_FORMAT))
+                    else:
+                        msg = protocol.send_both(latest_readings['hum'], latest_readings['temp'])
+                        client_socket.sendall(msg.encode(ENCODING_FORMAT))
 
                 case 'exit' if client_type == ClientType.CLIENT:
                     print(f"[-] {client_name} requested disconnect.")
@@ -135,6 +163,10 @@ def handle_client(client_socket, client_address, client_type : ClientType):
     except Exception as e:
         print(f"Error handling {client_name}: {e}")
     finally:
+        # if this connection was a sensor, unregister it so clients get errors again
+        if sensor_key is not None:
+            running_sensors.discard(sensor_key)
+            print(f"[-] Sensor '{sensor_key}' is no longer running.")
         client_socket.close()
         print(f"Connection with {client_name} ({client_address}) closed.")
           
@@ -157,4 +189,3 @@ def start():
 start()
 
     
-

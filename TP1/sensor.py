@@ -4,7 +4,7 @@ import sys
 import random
 import time
 
-from protocol import IP_ADDRESS, IP_PORT, ENCODING_FORMAT, BUFFER_SIZE, CLIENTS_NUMBER
+from protocol import IP_ADDRESS, IP_PORT, ENCODING_FORMAT, BUFFER_SIZE, CLIENTS_NUMBER, ClientType
 
 def sense_humidity():
     return random.randrange(0, 100)
@@ -18,7 +18,7 @@ def start_client(sensor_type: str, client_name: str):
         client_socket.connect((IP_ADDRESS, IP_PORT))
         print(f"Connected to server at {IP_ADDRESS}:{IP_PORT}")
 
-        message = protocol.init_connection(client_name)
+        message = protocol.init_connection(client_name, ClientType.SENSOR.value)
         client_socket.sendall(message.encode(ENCODING_FORMAT))
         print(f"Sent: {message}")
 

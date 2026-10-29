@@ -20,8 +20,8 @@ def info():
         - The server responds with an OK message when the socket is successfully created.
         ''')
     
-def init_connection(client_name: str):
-    return f'NAME:{client_name}'
+def init_connection(client_name: str, client_type: str = ClientType.CLIENT.value):
+    return f'NAME:{client_name}:{client_type}'
     
 def ack():
     return 'OK'
